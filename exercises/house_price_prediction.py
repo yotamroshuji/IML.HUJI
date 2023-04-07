@@ -216,4 +216,4 @@ if __name__ == '__main__':
         showlegend=False
     )
 
-    figure.write_image("average_loss_over_training_set.png")
+    figure.show()

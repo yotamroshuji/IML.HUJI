@@ -51,14 +51,14 @@ if __name__ == '__main__':
     israel_df = df[df.Country == 'Israel']
     fig = px.scatter(x=israel_df.DayOfYear, y=israel_df.Temp, color=israel_df.Year.astype(str))
     fig.update_layout(xaxis_title='Day of the Year', yaxis_title='Temperature', title='Temperature by Day in Israel')
-    fig.write_image('temp_by_day_in_israel.png')
+    fig.show()
 
     # Question 3 - Exploring differences between countries
     std_of_temp_per_month = israel_df.groupby(['Month'], as_index=False).agg(temp_std=('Temp', 'std'))
     fig = px.bar(x=std_of_temp_per_month.Month, y=std_of_temp_per_month.temp_std)
     fig.update_layout(xaxis_title='Month', yaxis_title='Standard Deviation',
                       title='Temperature Standard Deviation During Multiple Years')
-    fig.write_image('temp_std_deviation_during_multiple_years.png')
+    fig.show()
 
     country_month_temps = df.groupby(by=['Country', 'Month'], as_index=False).agg(avg_temp=('Temp', 'mean'),
                                                                                   std_temp=('Temp', 'std'))
@@ -66,7 +66,7 @@ if __name__ == '__main__':
                   color=country_month_temps['Country'], error_y=country_month_temps['std_temp'])
     fig.update_layout(xaxis_title="Month", yaxis_title="Average Temperature",
                       title="Average Temperature with Deviation Over Multiple Years")
-    fig.write_image("avg_temp_with_deviation_over_multiple_years.png")
+    fig.show()
 
     # Question 4 - Fitting model for different values of `k`
     train_X, train_y, test_X, test_y = split_train_test(israel_df['DayOfYear'], israel_df['Temp'])
@@ -81,7 +81,7 @@ if __name__ == '__main__':
     fig = px.bar(x=k_degree_to_loss.k_degree, y=k_degree_to_loss.loss)
     fig.update_layout(xaxis_title="Polynomial Degree (k)", yaxis_title="Test error (loss)",
                       title="Error of Temperature Prediction Using DayOfYear by Polynomial Degree (k)")
-    fig.write_image('temp_predict_err_by_polynomial_deg.png')
+    fig.show()
 
     # Question 5 - Evaluating fitted model on different countries
     # I chose to use k=4
@@ -98,4 +98,4 @@ if __name__ == '__main__':
     fig = px.bar(country_to_loss, x='Country', y='loss', color='Country')
     fig.update_layout(yaxis_title="Model Prediction Error (loss)",
                       title="Temperature Prediction of Model Trained on Israel Data")
-    fig.write_image('temp_in_different_countries_with_israel_model.png')
+    fig.show()
