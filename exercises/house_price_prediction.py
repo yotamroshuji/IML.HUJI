@@ -3,7 +3,7 @@ import os
 from IMLearn.utils import split_train_test
 from IMLearn.learners.regressors import LinearRegression
 
-from typing import NoReturn, Optional, Tuple
+from typing import NoReturn, Optional
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
@@ -58,77 +58,10 @@ def preprocess_data(X: pd.DataFrame, y: Optional[pd.Series] = None):
     X['date'] = pd.to_datetime(X['date'], format='%Y%m%dT', errors="coerce").apply(
         lambda x: x.timestamp() if pd.notna(x) else pd.NA)
 
+    # Update the metadata after making sure all cols are numeric (date) and removing unneeded cols
     if is_train_data:
-        X, y = _preprocess_train_data(X, y)
+        _collect_train_metadata(X, y)
 
-    else:
-        X = _preprocess_test_data(X)
-
-    # Returning all values as floats
-    return X.astype(float), y
-
-
-def _preprocess_train_data(X: pd.DataFrame, y: pd.Series) -> Tuple[pd.DataFrame, pd.Series]:
-    """
-    Preprocess data for train data (rows can be removed, and metadata is saved for preprocessing test data).
-    :param X: DataFrame of shape (n_samples, n_features)
-              Design matrix of regression problem
-    :param y: array-like of shape (n_samples, )
-              Response vector corresponding given samples
-    :return: Preprocessed training data and response vector.
-    """
-    # Add "price" to X to make it easier to handle indexes
-    X['price'] = y
-
-    X = X.dropna().drop_duplicates()
-
-    # Remove rows with negative values for any of the following columns
-    non_negative_cols = ['price', 'bedrooms', 'bathrooms', 'sqft_living', 'sqft_lot', 'floors', 'sqft_above',
-                         'sqft_basement', 'yr_built', 'yr_renovated', 'zipcode', 'sqft_living15', 'sqft_lot15']
-
-    X = X[(X[non_negative_cols] >= 0).all(axis=1)]
-
-    non_zero_cols = ['price', 'sqft_lot', 'floors', 'yr_built', 'zipcode', 'sqft_lot15']
-
-    X = X[(X[non_zero_cols] != 0).all(axis=1)]
-
-    # Make sure categories are only in the correct span
-    X = X[X.waterfront.isin({0, 1}) &
-          X.view.between(0, 4) &
-          X.condition.between(1, 5) &
-          X.grade.between(1, 13)]
-
-    # Make sure sqft sum up correctly
-    X = X[X.sqft_above + X.sqft_basement == X.sqft_living]
-
-    # Make sure renovation isn't before the house was built
-    X = X[(X.yr_built <= X.yr_renovated) | (X.yr_renovated == 0)]
-
-    # Remove outliers in house price
-    extreme_high_price = X['price'].quantile(0.999)
-    extreme_low_price = X['price'].quantile(0.001)
-    X = X[X['price'].between(extreme_low_price, extreme_high_price)]
-
-    # Update preprocess training data for test data before categorical fields, so
-    # all fields exist (yr_built, etc... for the median calculation)
-    train_metadata.col_median_values = X.median(axis=0)
-
-    # Formulate categorical fields (zipcode and years_since_renovation/built)
-    X = _preprocess_categorical_fields(X)
-
-    # Return the prices back to the y column
-    y = X['price'].astype(float)
-    X = X.drop("price", axis=1)
-    return X, y
-
-
-def _preprocess_test_data(X: pd.DataFrame) -> pd.DataFrame:
-    """
-    Preprocess test data (sample matrix). No rows are removed.
-    :param X: DataFrame of shape (n_samples, n_features)
-              Design matrix of regression problem
-    :return: Preprocessed X matrix
-    """
     # Replace invalid values in rows to ones that make sense.
     is_zero_or_nan = lambda x: x.isna() | x == 0
     is_negative_or_nan = lambda x: x.isna() | x.lt(0)
@@ -174,7 +107,6 @@ def _preprocess_test_data(X: pd.DataFrame) -> pd.DataFrame:
         X.loc[condition_mask, column] = replacement_value
 
     # After fixing all values, make sure that:
-
     # Sqft sum up correctly, otherwise, change the sqft_living to match the sum of sqft_above + sqft_basement
 
     invalid_sum_mask = X.sqft_above + X.sqft_basement != X.sqft_living
@@ -187,7 +119,30 @@ def _preprocess_test_data(X: pd.DataFrame) -> pd.DataFrame:
     # Add the categorical columns and make sure to keep those from the train data/add missing ones
     X = _preprocess_categorical_fields(X)
 
-    return X
+    # Make train specific changes
+    if is_train_data:
+        # Drop rows with negative/zero/nan prices
+        y = y[~(y.isna() | y.lt(0))]
+
+        # Remove outliers in house price
+        extreme_high_price = y.quantile(0.999)
+        extreme_low_price = y.quantile(0.001)
+        y = y[y.between(extreme_low_price, extreme_high_price)]
+
+        # Drop duplicate rows
+        X = X.drop_duplicates()
+
+        # Keep only indexes than remain in X and y
+        shared_indexes = y.index.intersection(X.index)
+        X = X.loc[shared_indexes]
+        y = y.loc[shared_indexes]
+
+    # Returning all values as floats
+    return X.astype(float), y
+
+
+def _collect_train_metadata(X: pd.DataFrame, y: pd.Series):
+    train_metadata.col_median_values = X.median(axis=0)
 
 
 def _preprocess_categorical_fields(X: pd.DataFrame) -> pd.DataFrame:
