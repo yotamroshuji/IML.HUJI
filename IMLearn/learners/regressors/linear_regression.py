@@ -1,10 +1,12 @@
 from __future__ import annotations
+
 from typing import NoReturn
-from IMLearn.base import BaseEstimator
+
 import numpy as np
 from numpy.linalg import pinv
 
-from IMLearn.metrics import mean_square_error
+from ...base import BaseEstimator
+from ...metrics import mean_square_error
 
 
 class LinearRegression(BaseEstimator):
@@ -78,8 +80,8 @@ class LinearRegression(BaseEstimator):
 
     def __add_intercept(self, X: np.ndarray) -> np.ndarray:
         return np.column_stack(
-                [np.ones((len(X), 1)), X]
-            )
+            [np.ones((len(X), 1)), X]
+        )
 
     def _loss(self, X: np.ndarray, y: np.ndarray) -> float:
         """

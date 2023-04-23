@@ -79,24 +79,21 @@ def preprocess_data(X: pd.DataFrame, y: Optional[pd.Series] = None):
         ('sqft_lot', is_negative_or_nan, train_medians['sqft_lot']),
         ('floors', is_negative_or_zero_or_nan, train_medians['floors']),
 
-        ('waterfront', is_outside_or_nan(0, 1), 0),
+        ('waterfront', is_outside_or_nan(0, 1), train_medians['waterfront']),
         ('view', is_outside_or_nan(0, 4), train_medians['view']),
         ('condition', is_outside_or_nan(1, 5), train_medians['condition']),
         ('grade', is_outside_or_nan(1, 13), train_medians['grade']),
 
         ('sqft_above', is_negative_or_nan, train_medians['sqft_above']),
         ('sqft_basement', is_negative_or_nan, train_medians['sqft_basement']),
+        ('yr_built', is_negative_or_zero_or_nan, train_medians['yr_built']),
 
-        # Assume all houses were built after 1900, and for anything else
-        # give a value of -np.inf, so the year the house was built is set to a long time ago
-        ('yr_built', lambda x: x.isna(), train_medians['yr_built']),
-        ('yr_built', lambda x: x.lt(1900), -np.inf),
+        # If the yr_renovated is invalid, set it to zero (no renovation occurred)
+        ('yr_renovated', is_negative_or_nan, 0),
 
-        # If the renovation is smaller than 1900, set it to zero
-        ('yr_renovated', lambda x: x.isna() | x.lt(1900), 0),
-
-        # If the zipcode stated in this dataset does not exist in the train dataset (which
-        # deals with illegal zipcodes), it will not appear in the final dataset, so we can ignore it for now.
+        # Replace invalid zipcodes with a missing value - this will be handled when creating the onehot columns.
+        # Viable zipcode range: https://facts.usps.com/42000-zip-codes/
+        ('zipcode', is_outside_or_nan(501, 99950), pd.NA),
 
         ('sqft_living15', is_negative_or_nan, train_medians['sqft_living15']),
         ('sqft_lot15', is_negative_or_nan, train_medians['sqft_lot15']),

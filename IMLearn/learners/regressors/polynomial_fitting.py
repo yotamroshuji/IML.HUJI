@@ -1,8 +1,11 @@
 from __future__ import annotations
+
 from typing import NoReturn
-from IMLearn.learners.regressors import LinearRegression
-from IMLearn.base import BaseEstimator
+
 import numpy as np
+
+from . import LinearRegression
+from ...base import BaseEstimator
 
 
 class PolynomialFitting(BaseEstimator):
