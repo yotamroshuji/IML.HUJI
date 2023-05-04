@@ -31,6 +31,7 @@ class Perceptron(BaseEstimator):
             A callable to be called after each update of the model while fitting to given data
             Callable function should receive as input a Perceptron instance, current sample and current response
     """
+
     def __init__(self,
                  include_intercept: bool = True,
                  max_iter: int = 1000,
@@ -73,7 +74,26 @@ class Perceptron(BaseEstimator):
         -----
         Fits model with or without an intercept depending on value of `self.fit_intercept_`
         """
-        raise NotImplementedError()
+        if self.include_intercept_:
+            X = self.__add_intercept(X)
+
+        feature_count = X.shape[1]
+        self.coefs_ = np.zeros((feature_count, ))
+
+        # Setting self.fitted_ to True, to allow for using the loss/predict function inside the callback
+        # method.
+        self.fitted_ = True
+        for _ in range(self.max_iter_):
+            misclassified_indexes = np.where(y * (X @ self.coefs_) <= 0)[0]
+            if misclassified_indexes.size == 0:
+                break
+
+            current_sample_idx = misclassified_indexes[0]
+            current_sample, current_response = X[current_sample_idx], y[current_sample_idx]
+            self.coefs_ += current_sample * current_response
+            self.callback_(self, current_sample, current_response)
+
+        # self.callback_(self, None, None)
 
     def _predict(self, X: np.ndarray) -> np.ndarray:
         """
@@ -89,7 +109,10 @@ class Perceptron(BaseEstimator):
         responses : ndarray of shape (n_samples, )
             Predicted responses of given samples
         """
-        raise NotImplementedError()
+        if self.include_intercept_:
+            X = self.__add_intercept(X)
+
+        return np.sign(X @ self.coefs_)
 
     def _loss(self, X: np.ndarray, y: np.ndarray) -> float:
         """
@@ -109,4 +132,10 @@ class Perceptron(BaseEstimator):
             Performance under missclassification loss function
         """
         from ...metrics import misclassification_error
-        raise NotImplementedError()
+        predicted_y = self._predict(X)
+        return misclassification_error(y, predicted_y)
+
+    def __add_intercept(self, X: np.ndarray) -> np.ndarray:
+        return np.column_stack(
+            [np.ones((len(X), 1)), X]
+        )
