@@ -51,7 +51,10 @@ def run_perceptron():
         losses = []
 
         def loss_recorder(perceptron: Perceptron, sample: np.ndarray, response: int):
-            losses.append(perceptron.loss(X, y))
+            # Record loss for all except the last iteration (where sample and response return as null),
+            # to avoid double loss collection.
+            if sample is not None and response is not None:
+                losses.append(perceptron.loss(X, y))
 
         Perceptron(callback=loss_recorder).fit(X, y)
 
@@ -61,7 +64,8 @@ def run_perceptron():
                 go.Scatter(x=np.array(range(1, len(losses) + 1)), y=np.array(losses))
             ]
         )
-        figure.update_layout(xaxis_title='Iteration', yaxis_title='Loss', title=n)
+        figure.update_layout(xaxis_title='Iteration', yaxis_title='Misclassification Error',
+                             title=f"Perceptron Misclassification Error on {n} data")
         figure.show()
 
 
@@ -94,30 +98,61 @@ def compare_gaussian_classifiers():
     """
     Fit both Gaussian Naive Bayes and LDA classifiers on both gaussians1 and gaussians2 datasets
     """
+    class_color_palette = np.array(px.colors.DEFAULT_PLOTLY_COLORS)
+
     for f in ["gaussian1.npy", "gaussian2.npy"]:
         # Load dataset
-        raise NotImplementedError()
+        X, y = load_dataset(os.path.join('../datasets', f))
 
         # Fit models and predict over training set
-        raise NotImplementedError()
+        lda = LDA().fit(X, y)
+        lda_prediction = lda.predict(X)
+        naive_bayes = GaussianNaiveBayes().fit(X, y)
+        naive_bayes_prediction = naive_bayes.predict(X)
 
-        # Plot a figure with two suplots, showing the Gaussian Naive Bayes predictions on the left and LDA predictions
+        # Plot a figure with two subplots, showing the Gaussian Naive Bayes predictions on the left and LDA predictions
         # on the right. Plot title should specify dataset used and subplot titles should specify algorithm and accuracy
         # Create subplots
         from IMLearn.metrics import accuracy
-        raise NotImplementedError()
+        figure = make_subplots(
+            rows=1, cols=2,
+            subplot_titles=[f"Gaussian Naive Bayes (accuracy: {accuracy(y, naive_bayes_prediction)})",
+                            f"LDA (accuracy: {accuracy(y, lda_prediction)})"])
 
-        # Add traces for data-points setting symbols and colors
-        raise NotImplementedError()
+        # Create covariance matrices for each class variance (will be a diagonal matrix)
+        naive_bayes_covs = [np.identity(len(vars_k)) * vars_k
+                            for mu_k, vars_k in zip(naive_bayes.mu_, naive_bayes.vars_)]
 
-        # Add `X` dots specifying fitted Gaussians' means
-        raise NotImplementedError()
+        # To reduce code duplication, I require each model to supply its prediction, mu (for each class) and cov
+        # (also for each class).
+        for idx, (prediction, mu, covs) in enumerate([
+            (naive_bayes_prediction, naive_bayes.mu_, naive_bayes_covs),
+            (lda_prediction, lda.mu_, [lda.cov_] * len(lda.mu_))
+        ]):
 
-        # Add ellipses depicting the covariances of the fitted Gaussians
-        raise NotImplementedError()
+            # Add traces for data-points setting symbols and colors
+            figure.add_trace(
+                go.Scatter(x=X[:, 0], y=X[:, 1], mode='markers',
+                           marker=go.scatter.Marker(color=class_color_palette[prediction],
+                                                    symbol=y)),
+                row=1, col=idx + 1
+            )
+
+            # Add `X` dots specifying fitted Gaussians' means
+            figure.add_trace(
+                go.Scatter(x=mu[:, 0], y=mu[:, 1], mode='markers',
+                           marker=go.scatter.Marker(color="black", symbol="x", size=18)), row=1, col=idx + 1
+            )
+
+            # Add ellipses depicting the covariances of the fitted Gaussians
+            for k_idx, cov_k in enumerate(covs):
+                figure.add_trace(get_ellipse(mu[k_idx], cov_k), row=1, col=idx + 1)
+
+        figure.update_layout(title=f'Dataset: {f} predictions', showlegend=False)
+        figure.show()
 
 
 if __name__ == '__main__':
     np.random.seed(0)
     run_perceptron()
-    # compare_gaussian_classifiers()
+    compare_gaussian_classifiers()

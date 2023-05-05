@@ -39,11 +39,10 @@ def misclassification_error(y_true: np.ndarray, y_pred: np.ndarray, normalize: b
     -------
     Misclassification of given predictions
     """
-    hinge_losses = np.maximum(0, 1 - y_true * y_pred)
-    loss = hinge_losses.sum()
+    misclassified_error = (y_true != y_pred).sum()
     if normalize:
-        loss /= len(hinge_losses)
-    return loss
+        misclassified_error /= len(y_true)
+    return misclassified_error
 
 
 def accuracy(y_true: np.ndarray, y_pred: np.ndarray) -> float:
@@ -62,7 +61,7 @@ def accuracy(y_true: np.ndarray, y_pred: np.ndarray) -> float:
     Accuracy of given predictions
     """
     # Calculate the accuracy as (True Positives + True Negatives) / (Positives + Negatives)
-    correct_predictions = np.sum(y_true == y_pred)
+    correct_predictions = (y_true == y_pred).sum()
     return correct_predictions / len(y_pred)
 
 
@@ -98,8 +97,3 @@ def softmax(X: np.ndarray) -> np.ndarray:
         Softmax(x) for every sample x in given data X
     """
     raise NotImplementedError()
-
-
-if __name__ == '__main__':
-    assert accuracy(np.array([1, 1, 1, -1, -1, -1]), np.array([1, 1, 1, -1, -1, -1])) == 1
-    assert accuracy(np.array([1, 1, 1, -1, -1, -1]), np.array([1, 1, 1, -1, -1, 1])) == 5 / 6

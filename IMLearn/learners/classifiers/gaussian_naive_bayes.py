@@ -46,16 +46,13 @@ class GaussianNaiveBayes(BaseEstimator):
         # Save the classes in a specific order (just to be civil)
         label_counts = dict(sorted(zip(*np.unique(y, return_counts=True)), key=lambda x: x[0]))
 
-        self.classes_ = np.array(label_counts.keys())
+        self.classes_ = np.array(list(label_counts.keys()))
         self.pi_ = np.array([count / sample_count for _, count in label_counts.items()])
-        self.mu_ = np.array([
-            # Take each row in X that matches the correct label and sum the columns (features)
-            (1 / label_count) * X[y == label].sum(axis=1)
-            for label, label_count in label_counts.items()
-        ])  # This way, each row is a label, and each column is a feature
+        self.mu_ = np.array([X[y == label].mean(axis=0) for label in self.classes_])
+        # This way, each row is a label, and each column is a feature
 
         self.vars_ = np.array([
-            (1 / label_count) * np.sum((X[y == label] - self.mu_[label_idx, :]) ** 2, axis=1)
+            (1 / label_count) * np.sum((X[y == label] - self.mu_[label_idx, :]) ** 2, axis=0)
             for label_idx, (label, label_count) in enumerate(label_counts.items())
         ])
 
@@ -73,20 +70,8 @@ class GaussianNaiveBayes(BaseEstimator):
         responses : ndarray of shape (n_samples, )
             Predicted responses of given samples
         """
-        # Build a "covariance" matrices - will just be a variance matrix for with all variances on the diagonal
-        variance_matrices = [np.identity(len(self.vars_)) @ class_variances for class_variances in self.vars_]
-
-        # Use the normal Bayes Optimal classifier prediction shown in claim 3.5.2
-        a_k__b_k = np.array(
-            [
-                (
-                    (variance_matrix @ mu_k),
-                    np.log(pi_k) - 0.5 * mu_k.T @ variance_matrix @ mu_k
-                )
-                for mu_k, pi_k, variance_matrix in zip(self.mu_, self.pi_, variance_matrices)
-            ]
-        )
-        maximizing_k_index = np.argmax([a_k.T @ X + b_k for a_k, b_k in a_k__b_k])
+        # Just need to maximize likelihood
+        maximizing_k_index = np.argmax(self.likelihood(X), axis=1)
         return self.classes_[maximizing_k_index]
 
     def likelihood(self, X: np.ndarray) -> np.ndarray:
@@ -106,11 +91,13 @@ class GaussianNaiveBayes(BaseEstimator):
         """
         if not self.fitted_:
             raise ValueError("Estimator must first be fitted before calling `likelihood` function")
-         # TODO: this (got too tired)
-        np.array([
-            np.product((1 / np.sqrt(2 * np.pi * var_k)) * np.exp(-0.5 * (X - mu_k) ** 2 / var_k), axis=1)
-            for mu_k, var_k in zip(self.mu_, self.vars_)
-        ])
+
+        return np.array([
+            np.product(
+                (1 / np.sqrt(2 * np.pi * var_k)) * np.exp(-0.5 * (X - mu_k) ** 2 / var_k),
+                axis=1) * pi_k
+            for mu_k, var_k, pi_k in zip(self.mu_, self.vars_, self.pi_)
+        ]).T
 
     def _loss(self, X: np.ndarray, y: np.ndarray) -> float:
         """

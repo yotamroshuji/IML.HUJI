@@ -53,7 +53,7 @@ class LDA(BaseEstimator):
         label_counts = dict(sorted(zip(*np.unique(y, return_counts=True)), key=lambda x: x[0]))
         label_order = {label: idx for idx, label in enumerate(label_counts)}
 
-        self.classes_ = np.array(label_counts.keys())
+        self.classes_ = np.array(list(label_counts.keys()))
         self.pi_ = np.array([label_count / sample_count for label_count in label_counts.values()])
         self.mu_ = np.array([X[y == label].mean(axis=0) for label in label_counts])
 
@@ -77,17 +77,8 @@ class LDA(BaseEstimator):
         responses : ndarray of shape (n_samples, )
             Predicted responses of given samples
         """
-        # Prediction is given using claim 3.5.2 from the book
-        a_k__b_k = np.array(
-            [
-                (
-                    (self._cov_inv @ mu_k),
-                    np.log(pi_k) - 0.5 * mu_k.T @ self._cov_inv @ mu_k
-                )
-                for mu_k, pi_k in zip(self.mu_, self.pi_)
-            ]
-        )
-        maximizing_k_index = np.argmax([a_k.T @ X + b_k for a_k, b_k in a_k__b_k])
+        # We choose the classes maximizing the likelihood
+        maximizing_k_index = np.argmax(self.likelihood(X), axis=1)
         return self.classes_[maximizing_k_index]
 
     def likelihood(self, X: np.ndarray) -> np.ndarray:
@@ -111,7 +102,7 @@ class LDA(BaseEstimator):
         features_count = X.shape[1]
 
         # Calculate the likelihood for each sample under each class
-        denominator = np.sqrt((np.pi ** features_count) * det(self.cov_))
+        denominator = np.sqrt(((2 * np.pi) ** features_count) * det(self.cov_))
 
         # This creates a matrix, where each row is a sample, and each column is the likelihood of that class
         # (in the order they appear in the class)
@@ -120,9 +111,9 @@ class LDA(BaseEstimator):
                 # Using einsum because it's cool -> multiplies the first two matrices, and does by-element
                 # multiplication of the resulting matrix and the last one, then sums all the cols in a row, leaving
                 # a vector of size X.shape[0] (number of samples)
-                pi_k * np.exp(-0.5 * np.einsum('ij,jk,ik->i', X - pi_k, self._cov_inv, X - pi_k))
+                pi_k * np.exp(-0.5 * np.einsum('ij,jk,ik->i', X - mu_k, self._cov_inv, X - mu_k))
                 for mu_k, pi_k, in zip(self.mu_, self.pi_)
-            ]) / denominator
+            ]).T / denominator
 
     def _loss(self, X: np.ndarray, y: np.ndarray) -> float:
         """

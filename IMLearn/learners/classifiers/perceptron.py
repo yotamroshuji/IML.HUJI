@@ -93,7 +93,8 @@ class Perceptron(BaseEstimator):
             self.coefs_ += current_sample * current_response
             self.callback_(self, current_sample, current_response)
 
-        # self.callback_(self, None, None)
+        # The 'rolling segel updates' we need to call this again after the final iteration.
+        self.callback_(self, None, None)
 
     def _predict(self, X: np.ndarray) -> np.ndarray:
         """
