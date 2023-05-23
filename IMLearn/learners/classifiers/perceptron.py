@@ -137,6 +137,11 @@ class Perceptron(BaseEstimator):
         return misclassification_error(y, predicted_y)
 
     def __add_intercept(self, X: np.ndarray) -> np.ndarray:
+        """
+        Adds an intercept to the inputted array as the first column.
+        :param X: array to add the intercept to
+        :return: the array with an intercept
+        """
         return np.column_stack(
             [np.ones((len(X), 1)), X]
         )
