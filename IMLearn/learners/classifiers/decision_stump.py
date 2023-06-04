@@ -4,6 +4,8 @@ from ...base import BaseEstimator
 import numpy as np
 from itertools import product
 
+from ...metrics import misclassification_error
+
 
 class DecisionStump(BaseEstimator):
     """
@@ -39,7 +41,20 @@ class DecisionStump(BaseEstimator):
         y : ndarray of shape (n_samples, )
             Responses of input data to fit to
         """
-        raise NotImplementedError()
+
+        # Set this to 1.1, because 1 is the maximum error possible
+        min_error = np.inf
+
+        # For each feature, check the threshold for each sign.
+        for feature_idx, sign in product(range(X.shape[1]), (-1, 1)):
+            threshold, threshold_error = self._find_threshold(X[:, feature_idx], y, sign)
+
+            # Choose the first feature with the minimal error (> and not >=)
+            if min_error > threshold_error:
+                min_error = threshold_error
+                self.sign_ = sign
+                self.j_ = feature_idx
+                self.threshold_ = threshold
 
     def _predict(self, X: np.ndarray) -> np.ndarray:
         """
@@ -63,7 +78,7 @@ class DecisionStump(BaseEstimator):
         Feature values strictly below threshold are predicted as `-sign` whereas values which equal
         to or above the threshold are predicted as `sign`
         """
-        raise NotImplementedError()
+        return np.where(X[:, self.j_] < self.threshold_, -self.sign_, self.sign_)
 
     def _find_threshold(self, values: np.ndarray, labels: np.ndarray, sign: int) -> Tuple[float, float]:
         """
@@ -88,18 +103,59 @@ class DecisionStump(BaseEstimator):
             Threshold by which to perform split
 
         thr_err: float between 0 and 1
-            Misclassificaiton error of returned threshold
+            Mis-classification error of returned threshold
 
         Notes
         -----
         For every tested threshold, values strictly below threshold are predicted as `-sign` whereas values
         which equal to or above the threshold are predicted as `sign`
         """
-        raise NotImplementedError()
+        # After playing around with large datasets, I noticed this function takes forever to run
+        # (used cProfile + snakeviz). Which is why I've made the code more complex to reduce time.
+
+        # To avoid calling misclassification_error and comparing each prediction to the labels for each new threshold
+        # (takes a lot of time),
+        # I order the list of values, and update the threshold by order. This way, only the prediction for a single
+        # value will change each time.
+
+        # Sort both values and labels
+        sorted_indexes = np.argsort(values)
+        values = values[sorted_indexes]
+        labels = labels[sorted_indexes]
+
+        # Find number of mislabeled values for the initial threshold (the first value), where all predicted labels
+        # are "sign".
+        mislabeled = [np.sum(labels == sign)]
+
+        # Go over each updated threshold, update the number of mislabeled values.
+        # Example - Start with prediction [sign, sign, sign], say mislabeled = 2
+        #           If we update the threshold, we will get [-sign, sign, sign]. If labels[0] == -sign, update
+        #           mislabeled = 1, otherwise update mislabeled to be 3.
+
+        for labeled_correctly in labels == -sign:
+            mislabeled.append(mislabeled[-1] + (-1 if labeled_correctly else 1))
+
+        # Finally return the least error, normalized between 0 and 1, with the correct threshold that caused it
+        min_mislabeled_idx = np.argmin(mislabeled)
+        thresholds = np.concatenate([[-np.inf], values[1:], [np.inf]])
+
+        return thresholds[min_mislabeled_idx], mislabeled[min_mislabeled_idx] / len(labels)
+        # TODO: remove this comment
+        # threshold_and_error = []
+        # # Go over each value, set it as the threshold, and check for mis-classification error.
+        # # If threshold == min(values), the prediction will all be sign.
+        # # Need to add np.inf, because if threshold == max(values), all values will be -sign, except for last one, and
+        # # we miss the "all -sign" prediction.
+        # for threshold in np.concatenate([values, [np.inf]]):
+        #     prediction = np.where(values >= threshold, sign, -sign)
+        #     error = misclassification_error(labels, prediction)
+        #     threshold_and_error.append((threshold, error))
+        #
+        # return min(threshold_and_error, key=lambda x: x[1])
 
     def _loss(self, X: np.ndarray, y: np.ndarray) -> float:
         """
-        Evaluate performance under misclassification loss function
+        Evaluate performance under mis-classification loss function
 
         Parameters
         ----------
@@ -114,4 +170,4 @@ class DecisionStump(BaseEstimator):
         loss : float
             Performance under missclassification loss function
         """
-        raise NotImplementedError()
+        return misclassification_error(y, self.predict(X))
