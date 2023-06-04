@@ -140,18 +140,6 @@ class DecisionStump(BaseEstimator):
         thresholds = np.concatenate([[-np.inf], values[1:], [np.inf]])
 
         return thresholds[min_mislabeled_idx], mislabeled[min_mislabeled_idx] / len(labels)
-        # TODO: remove this comment
-        # threshold_and_error = []
-        # # Go over each value, set it as the threshold, and check for mis-classification error.
-        # # If threshold == min(values), the prediction will all be sign.
-        # # Need to add np.inf, because if threshold == max(values), all values will be -sign, except for last one, and
-        # # we miss the "all -sign" prediction.
-        # for threshold in np.concatenate([values, [np.inf]]):
-        #     prediction = np.where(values >= threshold, sign, -sign)
-        #     error = misclassification_error(labels, prediction)
-        #     threshold_and_error.append((threshold, error))
-        #
-        # return min(threshold_and_error, key=lambda x: x[1])
 
     def _loss(self, X: np.ndarray, y: np.ndarray) -> float:
         """
