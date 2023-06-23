@@ -39,6 +39,7 @@ class GradientDescent:
         Callable function receives as input any argument relevant for the current GD iteration. Arguments
         are specified in the `GradientDescent.fit` function
     """
+
     def __init__(self,
                  learning_rate: BaseLR = FixedLR(1e-3),
                  tol: float = 1e-5,
@@ -119,4 +120,44 @@ class GradientDescent:
                 Euclidean norm of w^(t)-w^(t-1)
 
         """
-        raise NotImplementedError()
+
+        min_value = None
+        solution_weights = None
+        previous_weights = None
+        weights_delta = None
+
+        for iteration in range(self.max_iter_):
+            value = f.compute_output(X=X, y=y)
+            jacobian = f.compute_jacobian(X=X, y=y)
+            learning_step = self.learning_rate_.lr_step()
+
+            # Update out type specific parameters
+            if self.out_type_ == 'best':
+                if min_value is None or min_value > value:
+                    min_value = value
+                    solution_weights = f.weights.copy()
+
+            if self.out_type_ == 'average':
+                if solution_weights is None:
+                    solution_weights = f.weights.copy()
+                else:
+                    solution_weights = np.average([solution_weights, f.weights], axis=0, weights=[iteration + 1, 1])
+
+            if self.out_type_ == 'last':
+                solution_weights = f.weights.copy()
+
+            # Call the callback with the current iteration data
+            self.callback_(solver=self, weights=f.weights.copy(), val=value, grad=jacobian,
+                           t=iteration + 1, eta=learning_step, delta=weights_delta)
+
+            # Calculate Euclidean norm from last weights
+            weights_delta = np.linalg.norm(f.weights - previous_weights) if iteration else None
+            if weights_delta is not None and weights_delta < self.tol_:
+                break
+
+            # Update the weights in the direction of the jacobian and the loss
+            previous_weights = f.weights.copy()
+            f.weights -= learning_step * jacobian
+
+        # Otherwise return the last result
+        return solution_weights

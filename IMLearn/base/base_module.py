@@ -22,7 +22,7 @@ class BaseModule(ABC):
         weights: np.ndarray, default None
             Initial value of weights
         """
-        self.weights_ = weights
+        self.weights_: np.ndarray = weights
 
     def compute_output(self, **kwargs) -> np.ndarray:
         """
@@ -64,7 +64,7 @@ class BaseModule(ABC):
         raise NotImplementedError()
 
     @property
-    def weights(self):
+    def weights(self) -> np.ndarray:
         """
         Wrapper property to retrieve module parameter
 
